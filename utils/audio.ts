@@ -15,6 +15,7 @@ export class AudioEngine {
   private volume = 0.8;
   
   // Mapping of MIDI notes to URL filenames (Salamander Grand Piano V3)
+  // Using a reliable mirror for these specific filenames
   private readonly sampleMap: Record<number, string> = {
     21: 'A0.mp3', 24: 'C1.mp3', 27: 'Ds1.mp3', 30: 'Fs1.mp3',
     33: 'A1.mp3', 36: 'C2.mp3', 39: 'Ds2.mp3', 42: 'Fs2.mp3',
@@ -26,7 +27,8 @@ export class AudioEngine {
     105: 'A7.mp3', 108: 'C8.mp3'
   };
 
-  private readonly baseUrl = 'https://tonejs.github.io/audio/salamander/';
+  // Reliable CDN source for Salamander Piano samples
+  private readonly baseUrl = 'https://raw.githubusercontent.com/teropa/nlp/master/resources/audio/salamander/';
 
   constructor() {}
 
@@ -87,7 +89,7 @@ export class AudioEngine {
 
     // Reverb Send/Return
     const reverbSend = this.ctx.createGain();
-    reverbSend.gain.value = 0.25; // Reverb amount
+    reverbSend.gain.value = 0.2; // Slightly reduced reverb for cleaner mobile output
 
     // Connect:
     // Sources connect to -> mixBus AND reverbSend
@@ -103,14 +105,13 @@ export class AudioEngine {
     this.masterGain.connect(this.ctx.destination);
     
     // Store mixBus for voices to connect to
-    // (We'll attach this property to the class instance for easy access in playTone)
     (this as any).mixBus = mixBus;
     (this as any).reverbSend = reverbSend;
   }
 
   // High-fidelity Concert Hall Impulse Response
   private createReverbImpulse(ctx: AudioContext): AudioBuffer {
-    const duration = 3.0; // Long decay for a "Hall" sound
+    const duration = 2.5; // Slightly shorter tail for cleaner mix
     const decay = 3.0;
     const rate = ctx.sampleRate;
     const length = rate * duration;
@@ -134,18 +135,21 @@ export class AudioEngine {
   }
 
   public async loadSamples(onProgress: (percent: number) => void) {
-    // If not init, init
     if (!this.ctx) await this.init();
     if (!this.ctx) return;
 
     const notesToLoad = Object.keys(this.sampleMap).map(Number);
     const total = notesToLoad.length;
     let loaded = 0;
+    let errors = 0;
 
     const loadPromises = notesToLoad.map(async (midi) => {
       const filename = this.sampleMap[midi];
       try {
         const response = await fetch(`${this.baseUrl}${filename}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const arrayBuffer = await response.arrayBuffer();
         if (this.ctx) {
           const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
@@ -153,6 +157,7 @@ export class AudioEngine {
         }
       } catch (err) {
         console.error(`Failed to load sample ${filename}`, err);
+        errors++;
       } finally {
         loaded++;
         onProgress(Math.round((loaded / total) * 100));
@@ -160,6 +165,10 @@ export class AudioEngine {
     });
 
     await Promise.all(loadPromises);
+    
+    if (errors > 0) {
+        console.warn(`${errors} samples failed to load. The piano may have missing notes.`);
+    }
   }
 
   public setVolume(val: number) {
@@ -219,17 +228,13 @@ export class AudioEngine {
     // --- VOICE CHAIN ---
     
     // 1. Panner (Stereo Imaging)
-    // Map MIDI 21 (Left) -> 108 (Right)
     const panner = this.ctx.createStereoPanner();
     // Center point roughly at MIDI 60-64. 
-    // Range -0.9 to 0.9 to avoid extreme hard panning which sounds unnatural on headphones
     const panAmount = ((midi - 64) / 44) * 0.9; 
     panner.pan.value = Math.max(-0.9, Math.min(0.9, panAmount));
 
     // 2. Gain (Velocity/Volume)
     const gainNode = this.ctx.createGain();
-    // Humanize velocity: random variance between 0.85 and 1.0
-    // Bass notes naturally louder? No, keep even but add random flair.
     const velocity = 0.85 + Math.random() * 0.15; 
     gainNode.gain.value = velocity;
 
@@ -253,8 +258,6 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     
     // Release Physics
-    // Low notes have heavier strings, take longer to dampen.
-    // High notes dampen instantly.
     let releaseTime = this.sustain && !force ? 2.5 : 0.4; 
     if (!this.sustain && !force) {
         if (midi < 40) releaseTime = 0.6; // Bass damper is heavier/slower
@@ -273,7 +276,6 @@ export class AudioEngine {
         setTimeout(() => {
             const current = this.activeSources.get(midi);
             if (current === active) {
-                // Disconnect nodes to free memory
                 active.source.disconnect();
                 active.gain.disconnect();
                 active.panner.disconnect();
@@ -281,7 +283,7 @@ export class AudioEngine {
             }
         }, releaseTime * 1000 + 100);
     } catch (e) {
-        // Ignore errors if context is weird
+        // Ignore errors
     }
   }
 }

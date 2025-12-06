@@ -7,7 +7,7 @@ function App() {
   const [volume, setVolume] = useState(0.8);
   const [sustain, setSustain] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
-  const [loadingState, setLoadingState] = useState<'idle' | 'loading' | 'ready'>('idle');
+  const [loadingState, setLoadingState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [loadingProgress, setLoadingProgress] = useState(0);
 
   useEffect(() => {
@@ -19,19 +19,24 @@ function App() {
   }, [sustain]);
 
   const handleStart = async () => {
-    if (loadingState !== 'idle') return;
+    if (loadingState === 'loading' || loadingState === 'ready') return;
     
     setLoadingState('loading');
     
-    // Initialize audio context on user gesture
-    await audioEngine.init();
-    
-    // Load samples
-    await audioEngine.loadSamples((percent) => {
-      setLoadingProgress(percent);
-    });
-    
-    setLoadingState('ready');
+    try {
+        // Initialize audio context on user gesture
+        await audioEngine.init();
+        
+        // Load samples
+        await audioEngine.loadSamples((percent) => {
+          setLoadingProgress(percent);
+        });
+        
+        setLoadingState('ready');
+    } catch (e) {
+        console.error("Audio Init Error", e);
+        setLoadingState('error');
+    }
   };
 
   return (
@@ -73,14 +78,21 @@ function App() {
                     <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Maestro Piano</h2>
                     <p className="text-gray-400 mb-8 text-sm">Initializing Studio Audio Engine (EQ, Reverb, Compression)...</p>
                     
-                    {loadingState === 'idle' ? (
-                      <button 
-                        onClick={handleStart}
-                        className="group relative inline-flex items-center justify-center px-8 py-3 text-lg font-bold text-white transition-all duration-200 bg-amber-600 font-pj rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-600 hover:bg-amber-500 active:scale-95"
-                      >
-                          <span className="absolute inset-0 w-full h-full -mt-1 rounded-lg opacity-30 bg-gradient-to-b from-transparent via-transparent to-gray-700"></span>
-                          Load Studio Sounds
-                      </button>
+                    {loadingState === 'idle' || loadingState === 'error' ? (
+                      <div>
+                          {loadingState === 'error' && (
+                              <p className="text-red-400 mb-4 text-xs bg-red-900/20 p-2 rounded">
+                                  Initialization failed. Please check your connection and try again.
+                              </p>
+                          )}
+                          <button 
+                            onClick={handleStart}
+                            className="group relative inline-flex items-center justify-center px-8 py-3 text-lg font-bold text-white transition-all duration-200 bg-amber-600 font-pj rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-600 hover:bg-amber-500 active:scale-95"
+                          >
+                              <span className="absolute inset-0 w-full h-full -mt-1 rounded-lg opacity-30 bg-gradient-to-b from-transparent via-transparent to-gray-700"></span>
+                              {loadingState === 'error' ? 'Retry Loading' : 'Load Studio Sounds'}
+                          </button>
+                      </div>
                     ) : (
                       <div className="w-full max-w-xs mx-auto">
                         <div className="flex justify-between text-xs text-amber-500 mb-1 font-mono">
