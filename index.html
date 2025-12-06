@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Maestro Touch Piano</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Disable text selection and touch callouts for a native app feel */
+      body {
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        overscroll-behavior: none;
+      }
+      /* Hide scrollbar for clean look */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-900 text-white overflow-hidden">
+    <div id="root"></div>
+  </body>
+</html>

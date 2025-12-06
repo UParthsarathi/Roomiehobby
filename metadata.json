@@ -1,0 +1,5 @@
+{
+  "name": "Maestro Touch Piano",
+  "description": "A professional-grade, full 88-key mobile piano featuring low-latency synthesized audio, multitouch support, and a responsive realistic interface.",
+  "requestFramePermissions": []
+}
